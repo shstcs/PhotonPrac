@@ -1,15 +1,18 @@
+using Photon.Pun;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Pool;
 
-public class Gun : MonoBehaviour
+public class Gun : MonoBehaviourPun,IPunObservable
 {
     [SerializeField] private Transform _bulletPos;
     private Vector3 _mousePos;
     private Vector3 _targetDirection;
-    private void Awake()
+    private Quaternion _networkRotation;
+    private void Start()
     {
         
     }
@@ -22,7 +25,14 @@ public class Gun : MonoBehaviour
 
     void Update()
     {
-        RotateGun();
+        if (photonView.IsMine)
+        {
+            RotateGun();
+        }
+        else
+        {
+            transform.rotation = Quaternion.Lerp(transform.rotation, _networkRotation, Time.deltaTime*10);
+        }
     }
 
     private void RotateGun()
@@ -36,8 +46,23 @@ public class Gun : MonoBehaviour
 
     public void Shoot()
     {
-        GameObject bullet = CreateBullet();
-        bullet.transform.position = _bulletPos.position;
-        bullet.GetComponent<Bullet>().SetDirection(_targetDirection);
+        if (photonView.IsMine)
+        {
+            GameObject bullet = CreateBullet();
+            bullet.transform.position = _bulletPos.position;
+            bullet.GetComponent<Bullet>().SetDirection(_targetDirection);
+        }
+    }
+
+    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    {
+        if(stream.IsWriting)
+        {
+            stream.SendNext(transform.rotation);
+        }
+        else
+        {
+            _networkRotation = (Quaternion)stream.ReceiveNext();
+        }
     }
 }
